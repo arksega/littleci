@@ -1,0 +1,92 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: drone
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: drone
+  template:
+    metadata:
+      labels:
+        app: drone
+    spec:
+      tolerations:
+      - key: "node.kubernetes.io/unreachable"
+        operator: "Exists"
+        effect: "NoExecute"
+        tolerationSeconds: 30
+      - key: "node.kubernetes.io/not-ready"
+        operator: "Exists"
+        effect: "NoExecute"
+        tolerationSeconds: 30
+      volumes:
+      - name: drone-ps
+        persistentVolumeClaim:
+          claimName: drone-pv-claim
+      containers:
+      - name: drone
+        image: drone/drone:1.9.1
+        ports:
+        - containerPort: 80
+          name: http
+        - containerPort: 443
+          name: https
+        resources:
+          requests:
+            cpu: 1
+            memory: 512Mi
+          limits:
+            cpu: 2
+            memory: 1Gi
+        volumeMounts:
+        - name: drone-ps
+          mountPath: /data
+        env:
+        - name: DRONE_GITEA_SERVER
+          value: "http://kube00:32642/"
+        - name: DRONE_GITEA_CLIENT_ID
+          value: "b67351e3-52b7-47c0-9de8-57d602d63ef5"
+        - name: DRONE_GITEA_CLIENT_SECRET
+          value: "tySUSnWZLI3sG4xgoLE51WwLzNVQLiCE9mePRH5b4Tc="
+        - name: DRONE_RPC_SECRET
+          value: "75aca80a29c214b063e4b252beadcdb1"
+        - name: DRONE_SERVER_HOST
+          value: "kube00:32020"
+        - name: DRONE_SERVER_PROTO
+          value: "http"
+---
+apiVersion: v1
+kind: PersistentVolumeClaim
+metadata:
+  name: drone-pv-claim
+  labels:
+    app: drone
+spec:
+  storageClassName: longhorn
+  accessModes:
+  - ReadWriteOnce
+  resources:
+    requests:
+      storage: 1Gi
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: drone
+  labels:
+    app: drone
+spec:
+  ports:
+  - port: 80
+    name: http 
+    nodePort: 32020
+  - port: 443
+    name: https
+    nodePort: 32023
+  selector:
+    app: drone
+  type: NodePort
+
+# vim: set ts=2 sw=2
